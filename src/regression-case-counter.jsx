@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { Upload, ScanLine, RotateCcw, AlertCircle, FileSpreadsheet, Layers, ListOrdered, Plus, X, ArrowRight } from "lucide-react";
+import { Upload, ScanLine, RotateCcw, AlertCircle, FileSpreadsheet, Layers, ListOrdered, Plus, X, ArrowRight, Loader2, PartyPopper, Smile, Eye, CheckCircle2, Sparkles, Search } from "lucide-react";
 
 // ---- design tokens -------------------------------------------------------
 const T = {
@@ -15,6 +15,115 @@ const T = {
   hair: "#D2D8D0",
   danger: "#B3452F",
 };
+
+const GLOBAL_CSS = `
+@keyframes rccFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rccPop {
+  0%   { opacity: 0; transform: scale(0.85); }
+  60%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes rccSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes rccWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+.rcc-fade { animation: rccFadeUp 0.32s ease both; }
+.rcc-pop { animation: rccPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.rcc-spin { animation: rccSpin 0.8s linear infinite; }
+.rcc-mode-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.rcc-mode-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px -12px rgba(18, 38, 43, 0.25);
+  border-color: #2F7C6E !important;
+}
+.rcc-mode-card:hover .rcc-mode-icon {
+  animation: rccWiggle 0.5s ease;
+}
+.rcc-btn-primary, .rcc-btn-secondary, .rcc-btn-ghost {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+}
+.rcc-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px rgba(18, 38, 43, 0.45);
+}
+.rcc-btn-primary:active:not(:disabled) { transform: translateY(0); }
+.rcc-btn-secondary:hover, .rcc-btn-ghost:hover {
+  background: #E7EDE7 !important;
+  transform: translateY(-1px);
+}
+.rcc-btn-primary:disabled { opacity: 0.6; cursor: default; }
+.rcc-row {
+  transition: background 0.12s ease;
+}
+.rcc-row:hover {
+  background: #E7EDE7;
+}
+.rcc-dropzone {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rcc-preview-row:nth-child(even) { background: #EFF3EF; }
+.rcc-bg {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(-45deg, #E4EFE8, #DCE9E3, #F6E6C9, #EAF1EC, #D9EAE3);
+  background-size: 400% 400%;
+  animation: rccGradient 22s ease infinite;
+}
+@keyframes rccGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.rcc-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+}
+.rcc-content {
+  position: relative;
+  z-index: 1;
+}
+@keyframes rccFloat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-22px) rotate(6deg); }
+}
+.rcc-float-icon {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  animation-name: rccFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.rcc-tips-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(18, 38, 43, 0.88);
+  color: #F6F8F5;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12.5px;
+  padding: 10px 20px;
+  text-align: center;
+  z-index: 5;
+}
+.rcc-tips-footer span {
+  display: inline-block;
+}
+`;
+
 
 function normalizeHeader(h) {
   return String(h ?? "").trim().toLowerCase();
@@ -241,12 +350,12 @@ export default function RegressionCaseCounter() {
 
   return (
     <div
+      className="rcc-bg"
       style={{
-        background: T.paper,
-        minHeight: "100%",
+        minHeight: "100vh",
         fontFamily: "'IBM Plex Sans', sans-serif",
         color: T.ink,
-        padding: "28px 20px",
+        padding: "28px 20px 56px",
         boxSizing: "border-box",
       }}
     >
@@ -255,8 +364,13 @@ export default function RegressionCaseCounter() {
         href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
         rel="stylesheet"
       />
+      <style>{GLOBAL_CSS}</style>
+      <FloatingIcons />
+      <div className="rcc-blob" style={{ width: 340, height: 340, background: T.scan, opacity: 0.18, top: -120, left: -100 }} />
+      <div className="rcc-blob" style={{ width: 280, height: 280, background: T.flag, opacity: 0.14, top: 120, right: -90 }} />
+      <div className="rcc-blob" style={{ width: 260, height: 260, background: T.scan, opacity: 0.1, bottom: -100, left: "35%" }} />
 
-      <div style={{ maxWidth: 880, margin: "0 auto" }}>
+      <div className="rcc-content" style={{ maxWidth: 880, margin: "0 auto" }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 10 }}>
           <div>
@@ -271,7 +385,7 @@ export default function RegressionCaseCounter() {
                 gap: 10,
               }}
             >
-              <ScanLine size={22} color={T.scan} strokeWidth={2.4} />
+              <ScanLine size={22} color={T.scan} strokeWidth={2.4} className={busy ? "rcc-spin" : ""} />
               Regression Case Counter
             </div>
             <div style={{ fontSize: 13, color: T.inkFaint, marginTop: 3, fontFamily: "'IBM Plex Mono', monospace" }}>
@@ -279,7 +393,7 @@ export default function RegressionCaseCounter() {
             </div>
           </div>
           {stage !== "mode" && (
-            <button onClick={resetAll} style={ghostBtn}>
+            <button onClick={resetAll} style={ghostBtn} className="rcc-btn-ghost">
               <RotateCcw size={14} />
               Start over
             </button>
@@ -288,7 +402,7 @@ export default function RegressionCaseCounter() {
 
         {/* ---- mode select ---- */}
         {stage === "mode" && (
-          <div>
+          <div key="mode" className="rcc-fade">
             <div style={{ fontSize: 14.5, marginBottom: 16, color: T.inkFaint }}>Do you have multiple files, or would you like to go one at a time?</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <ModeCard
@@ -309,7 +423,7 @@ export default function RegressionCaseCounter() {
 
         {/* ---- upload ---- */}
         {stage === "upload" && (
-          <div>
+          <div key="upload" className="rcc-fade">
             <Field label="Keyword to match (case-insensitive, matches partial words too)">
               <input value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ ...selectStyle, fontFamily: "'IBM Plex Mono', monospace" }} />
             </Field>
@@ -325,13 +439,13 @@ export default function RegressionCaseCounter() {
                 setDragOver(false);
                 onFilesChosen(e.dataTransfer.files);
               }}
+              className="rcc-dropzone"
               style={{
                 background: T.paperRaised,
                 border: `2px dashed ${dragOver ? T.scan : T.hair}`,
                 borderRadius: 14,
                 padding: "48px 24px",
                 textAlign: "center",
-                transition: "border-color 0.15s ease",
               }}
             >
               <div
@@ -346,13 +460,13 @@ export default function RegressionCaseCounter() {
                   justifyContent: "center",
                 }}
               >
-                <Upload size={24} color={T.scan} />
+                {busy ? <Loader2 size={24} color={T.scan} className="rcc-spin" /> : <Upload size={24} color={T.scan} />}
               </div>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                {mode === "batch" ? "Drop all your spreadsheets here" : "Drop your spreadsheet here"}
+                {busy ? "Reading your file…" : mode === "batch" ? "Drop all your spreadsheets here" : "Drop your spreadsheet here"}
               </div>
               <div style={{ fontSize: 13, color: T.inkFaint, marginBottom: 18 }}>.xlsx or .xls — nothing leaves your browser</div>
-              <label style={primaryBtnLabel}>
+              <label style={primaryBtnLabel} className="rcc-btn-primary">
                 {mode === "batch" ? "Choose files" : "Choose file"}
                 <input
                   type="file"
@@ -365,7 +479,7 @@ export default function RegressionCaseCounter() {
             </div>
 
             {mode === "batch" && pendingFiles.length > 0 && (
-              <div style={{ marginTop: 18 }}>
+              <div style={{ marginTop: 18 }} className="rcc-fade">
                 <div style={{ fontSize: 12.5, color: T.inkFaint, marginBottom: 8, fontWeight: 500 }}>{pendingFiles.length} file(s) ready</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
                   {pendingFiles.map((f, i) => (
@@ -393,14 +507,23 @@ export default function RegressionCaseCounter() {
                     </div>
                   ))}
                 </div>
-                <button onClick={processBatch} style={primaryBtn} disabled={busy}>
-                  {busy ? "Reading files…" : `Process ${pendingFiles.length} file(s)`} <ArrowRight size={14} style={{ marginLeft: 6, verticalAlign: -2 }} />
+                <button onClick={processBatch} style={primaryBtn} className="rcc-btn-primary" disabled={busy}>
+                  {busy ? (
+                    <>
+                      <Loader2 size={14} className="rcc-spin" style={{ marginRight: 6, verticalAlign: -2 }} />
+                      Reading files…
+                    </>
+                  ) : (
+                    <>
+                      Process {pendingFiles.length} file(s) <ArrowRight size={14} style={{ marginLeft: 6, verticalAlign: -2 }} />
+                    </>
+                  )}
                 </button>
               </div>
             )}
 
             {error && (
-              <div style={{ marginTop: 16, color: T.danger, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ marginTop: 16, color: T.danger, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }} className="rcc-fade">
                 <AlertCircle size={14} /> {error}
               </div>
             )}
@@ -409,7 +532,7 @@ export default function RegressionCaseCounter() {
 
         {/* ---- configure (per file needing manual column pick) ---- */}
         {stage === "configure" && configQueue[configIndex] && (
-          <div>
+          <div key="configure" className="rcc-fade">
             <div
               style={{
                 display: "flex",
@@ -449,10 +572,17 @@ export default function RegressionCaseCounter() {
               </Field>
             </div>
 
+            <DataPreview
+              headers={configQueue[configIndex].headers}
+              rows={configQueue[configIndex].rows}
+              storyColIdx={storyColIdx}
+              titleColIdx={titleColIdx}
+            />
+
             {storyColIdx === -1 || titleColIdx === -1 ? (
-              <div style={{ fontSize: 13, color: T.inkFaint }}>Pick both columns to continue.</div>
+              <div style={{ fontSize: 13, color: T.inkFaint, marginTop: 14 }}>Pick both columns to continue.</div>
             ) : (
-              <button onClick={confirmConfig} style={primaryBtn}>
+              <button onClick={confirmConfig} style={{ ...primaryBtn, marginTop: 14 }} className="rcc-btn-primary">
                 <ScanLine size={15} style={{ marginRight: 7, verticalAlign: -2 }} />
                 {configIndex + 1 < configQueue.length ? "Scan and continue" : "Scan"}
               </button>
@@ -462,7 +592,8 @@ export default function RegressionCaseCounter() {
 
         {/* ---- single result (sequential mode) + ask for next ---- */}
         {stage === "result-single" && lastFile && (
-          <div>
+          <div key="result-single" className="rcc-fade">
+            <MoodBanner totalMatches={lastFile.totalMatches} />
             <FileResultBlock file={lastFile} />
             <div
               style={{
@@ -486,11 +617,12 @@ export default function RegressionCaseCounter() {
                     setError("");
                   }}
                   style={primaryBtn}
+                  className="rcc-btn-primary"
                 >
                   <Plus size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
                   Yes, add another
                 </button>
-                <button onClick={() => setStage("summary")} style={secondaryBtn}>
+                <button onClick={() => setStage("summary")} style={secondaryBtn} className="rcc-btn-secondary">
                   No, show final total
                 </button>
               </div>
@@ -500,7 +632,8 @@ export default function RegressionCaseCounter() {
 
         {/* ---- final summary across all processed files ---- */}
         {stage === "summary" && (
-          <div>
+          <div key="summary" className="rcc-fade">
+            <MoodBanner totalMatches={grandTotal} multi={completedFiles.length > 1} />
             <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
               <StatCard label="Files processed" value={completedFiles.length} />
               <StatCard label="Rows scanned" value={grandRows} />
@@ -527,20 +660,74 @@ export default function RegressionCaseCounter() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              <button onClick={downloadCsv} style={primaryBtn}>
+              <button onClick={downloadCsv} style={primaryBtn} className="rcc-btn-primary">
                 Export CSV
               </button>
-              <button onClick={resetAll} style={secondaryBtn}>
+              <button onClick={resetAll} style={secondaryBtn} className="rcc-btn-secondary">
                 Start over
               </button>
             </div>
           </div>
         )}
       </div>
+      <TipsFooter />
     </div>
   );
 }
+function FloatingIcons() {
+  const icons = [
+    { Icon: FileSpreadsheet, top: "8%", left: "6%", size: 38, duration: 7, delay: 0 },
+    { Icon: ScanLine, top: "18%", left: "88%", size: 32, duration: 8.5, delay: 0.5 },
+    { Icon: CheckCircle2, top: "40%", left: "3%", size: 30, duration: 6.5, delay: 1 },
+    { Icon: Sparkles, top: "60%", left: "92%", size: 34, duration: 9, delay: 0.2 },
+    { Icon: Search, top: "78%", left: "10%", size: 30, duration: 7.5, delay: 1.4 },
+    { Icon: FileSpreadsheet, top: "85%", left: "80%", size: 28, duration: 8, delay: 0.8 },
+    { Icon: Sparkles, top: "30%", left: "50%", size: 26, duration: 10, delay: 1.8 },
+    { Icon: ScanLine, top: "55%", left: "28%", size: 32, duration: 7.8, delay: 0.6 },
+    { Icon: CheckCircle2, top: "65%", left: "60%", size: 28, duration: 6.8, delay: 1.2 },
+    { Icon: Search, top: "48%", left: "75%", size: 26, duration: 9.5, delay: 0.3 },
+    { Icon: FileSpreadsheet, top: "70%", left: "42%", size: 24, duration: 8.2, delay: 1.6 },
+    { Icon: Sparkles, top: "58%", left: "8%", size: 22, duration: 7.2, delay: 2.1 },
+  ];
+  return (
+    <>
+      {icons.map(({ Icon, top, left, size, duration, delay }, i) => (
+        <div
+          key={i}
+          className="rcc-float-icon"
+          style={{ top, left, animationDuration: `${duration}s`, animationDelay: `${delay}s` }}
+        >
+          <Icon size={size} color={T.scan} strokeWidth={1.6} style={{ opacity: 0.32 }} />
+        </div>
+      ))}
+    </>
+  );
+}
 
+const TIPS = [
+  "Tip: keyword matching is case-insensitive and catches partial words too.",
+  "Tip: you can export your results as a CSV from the summary screen.",
+  "Tip: blank story/reference cells are automatically skipped from the count.",
+  "Tip: use \"Multiple files\" mode to combine several sheets into one total.",
+  "Fun fact: this app runs entirely in your browser — nothing you upload ever leaves your device.",
+];
+
+function TipsFooter() {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % TIPS.length);
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="rcc-tips-footer">
+      <span key={index} className="rcc-fade">
+        {TIPS[index]}
+      </span>
+    </div>
+  );
+}
 function FileResultBlock({ file }) {
   const maxCount = file.list[0]?.count || 1;
   return (
@@ -583,6 +770,7 @@ function FileResultBlock({ file }) {
             return (
               <div
                 key={e.story + i}
+                className="rcc-row"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 120px 100px",
@@ -638,6 +826,7 @@ function ModeCard({ icon, title, desc, onClick }) {
   return (
     <button
       onClick={onClick}
+      className="rcc-mode-card"
       style={{
         textAlign: "left",
         background: T.paperRaised,
@@ -650,12 +839,102 @@ function ModeCard({ icon, title, desc, onClick }) {
         gap: 10,
       }}
     >
-      <div style={{ width: 38, height: 38, borderRadius: 9, background: T.scanDim, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="rcc-mode-icon" style={{ width: 38, height: 38, borderRadius: 9, background: T.scanDim, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {icon}
       </div>
       <div style={{ fontWeight: 600, fontSize: 15 }}>{title}</div>
       <div style={{ fontSize: 12.5, color: T.inkFaint, lineHeight: 1.45 }}>{desc}</div>
     </button>
+  );
+}
+
+function MoodBanner({ totalMatches, multi }) {
+  const happy = totalMatches === 0;
+  return (
+    <div
+      className="rcc-pop"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: happy ? T.scanDim : T.flagDim,
+        border: `1px solid ${happy ? "#2F7C6E33" : "#D98E2B33"}`,
+        borderRadius: 12,
+        padding: "14px 18px",
+        marginBottom: 18,
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 9,
+          background: happy ? "#FFFFFF" : "#FFFFFF",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {happy ? <Smile size={20} color={T.scan} /> : <PartyPopper size={20} color={T.flag} />}
+      </div>
+      <div style={{ fontSize: 14.5, fontWeight: 600, color: happy ? "#215E52" : "#8A5A12" }}>
+        {happy
+          ? "Squeaky clean — no regression matches found!"
+          : `Found ${totalMatches} regression case${totalMatches === 1 ? "" : "s"}${multi ? " across your files" : ""} — tallied below.`}
+      </div>
+    </div>
+  );
+}
+
+function DataPreview({ headers, rows, storyColIdx, titleColIdx }) {
+  const previewRows = rows.slice(1, 4).filter((r) => r.some((c) => String(c).trim() !== ""));
+  if (!previewRows.length) return null;
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.inkFaint, marginBottom: 6, fontWeight: 500 }}>
+        <Eye size={13} />
+        Preview — first {previewRows.length} row(s)
+      </div>
+      <div style={{ border: `1px solid ${T.hair}`, borderRadius: 10, overflow: "hidden", fontSize: 12.5 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${headers.length}, minmax(90px, 1fr))`, overflowX: "auto" }}>
+          {headers.map((h, i) => (
+            <div
+              key={i}
+              style={{
+                padding: "7px 10px",
+                background: i === storyColIdx ? T.scanDim : i === titleColIdx ? T.flagDim : "#EFF3EF",
+                fontWeight: 600,
+                borderBottom: `1px solid ${T.hair}`,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {String(h) || `Col ${i + 1}`}
+            </div>
+          ))}
+          {previewRows.map((r, ri) =>
+            headers.map((_, ci) => (
+              <div
+                key={`${ri}-${ci}`}
+                className="rcc-preview-row"
+                style={{
+                  padding: "7px 10px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  color: ci === storyColIdx || ci === titleColIdx ? T.ink : T.inkFaint,
+                  fontWeight: ci === storyColIdx || ci === titleColIdx ? 600 : 400,
+                }}
+              >
+                {String(r[ci] ?? "")}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
